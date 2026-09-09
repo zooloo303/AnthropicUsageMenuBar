@@ -15,10 +15,10 @@ For regular use, move the app to `~/Applications` or `/Applications`, launch tha
 
 ## Connections
 
-- **Claude:** sign in to Claude Code with your Claude subscription. The app reads Claude Code's `Claude Code-credentials` Keychain item, with `.claude/.credentials.json` as a fallback. macOS may ask you to allow that Keychain access. After a session expires, sign in again in Claude Code, then refresh. The app never refreshes or rewrites Claude's credentials itself.
+- **Claude:** open **Settings → Connect Claude**, sign in on Claude's website, and click **Save connection**. The app remembers this connection in its own persistent WebKit browser store across restarts and updates. Refresh never opens a Claude Keychain password dialog. Claude can still expire or revoke a web session; reconnect if that happens. Until a web connection is saved, the app can reuse a silently accessible Claude Code sign-in as a compatibility fallback. It never prompts for that Keychain entry or refreshes/rewrites Claude Code's credentials.
 - **Codex:** sign in to your local Codex client with ChatGPT. The app locates Codex in common CLI, desktop, VS Code, and Zed installations. If needed, choose its executable in Settings. It uses the documented `account/rateLimits/read` app-server method over a short-lived local stdio connection; it never sends prompts or starts agent tasks.
 
-The Claude integration reads `https://api.anthropic.com/api/oauth/usage` using the existing Claude Code OAuth token. This is an **internal endpoint**, not a supported public API contract, and may change. Failures are shown explicitly, with a link to the provider's usage page. No API admin keys or manually entered dollar budgets are required.
+The Claude integration reads the web usage endpoint at `https://claude.ai/api/organizations/{id}/usage`, or the OAuth usage endpoint for the silent Claude Code fallback. These are **internal endpoints**, not supported public API contracts, and may change. Failures are shown explicitly, with a link to the provider's usage page. No API admin keys or manually entered dollar budgets are required.
 
 The app does not display API billing, dollar spend, or ChatGPT chat usage. These are subscription quota readings for Claude and Codex. Percentages and window durations come from the providers; missing data is never represented as zero.
 
@@ -30,8 +30,8 @@ The app does not display API billing, dollar spend, or ChatGPT chat usage. These
 - Shows last successful readings and an explicit error if a refresh fails. Past reset times say that a fresh reading is needed.
 - Supports extra model-specific quota windows when reported.
 - Optional menu bar percentages: `C` for Claude and `O` for OpenAI Codex, using each provider's first returned window.
-- Settings changes apply only after Save; Cancel discards the draft.
-- Stores only preferences in UserDefaults. Credentials are not copied or logged, and usage snapshots stay in memory. There is no telemetry.
+- Settings opens in its own window and stays open while you use controls or connection dialogs. Changes apply only after Save; Cancel or closing the window discards the draft.
+- Stores only preferences in UserDefaults. Claude web sign-in cookies stay in the app’s persistent WebKit store. Claude Code tokens and usage snapshots stay in memory. Credentials are never logged. There is no telemetry.
 
 ## Development and checks
 

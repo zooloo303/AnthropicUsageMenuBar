@@ -3,13 +3,14 @@ import UsageCore
 
 struct SettingsView: View {
     @ObservedObject var store: UsageStore
-    @Environment(\.dismiss) private var dismiss
+    private let onClose: () -> Void
     @State private var draft: Preferences
     @State private var error: String?
     @State private var saving = false
 
-    init(store: UsageStore) {
+    init(store: UsageStore, onClose: @escaping () -> Void) {
         self.store = store
+        self.onClose = onClose
         _draft = State(initialValue: store.preferences)
     }
 
@@ -29,17 +30,21 @@ struct SettingsView: View {
                     Toggle("Launch at login", isOn: $draft.launchAtLogin)
                 }
                 Section("Connections") {
-                    Text("Claude uses your Claude Code sign-in. Codex uses your local Codex sign-in with ChatGPT.")
+                    Text("Save a Claude web connection to keep your subscription sign-in between app restarts. Codex uses your local Codex sign-in with ChatGPT.")
                         .font(.caption).foregroundStyle(.secondary)
+                    Button("Connect Claude…") { store.connectClaude() }
                     HStack {
-                        TextField("Codex executable (automatic)", text: $draft.codexPath)
+                        TextField("Codex executable", text: $draft.codexPath,
+                                  prompt: Text("Find automatically"))
                         Button("Choose…") { chooseExecutable() }
                     }
+                    Text("Leave blank to find an installed copy of Codex automatically, including copies installed by Zed or VS Code.")
+                        .font(.caption).foregroundStyle(.secondary)
                     if let path = CodexLocator.find(override: draft.codexPath) {
                         Text("Found: \(path.path)").font(.caption2).foregroundStyle(.secondary)
                             .lineLimit(2).truncationMode(.middle).help(path.path)
                     }
-                    Text("After signing in again, click Refresh. Keys and passwords are never copied into this app.")
+                    Text("Refresh never opens a Claude password dialog. Manage your saved sign-in with Connect Claude.")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }
@@ -47,11 +52,11 @@ struct SettingsView: View {
             if let error { Text(error).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Cancel", action: onClose).keyboardShortcut(.cancelAction)
                 Button("Save") {
                     saving = true
                     Task {
-                        do { try await store.save(draft); dismiss() }
+                        do { try await store.save(draft); onClose() }
                         catch { self.error = error.localizedDescription; saving = false }
                     }
                 }
@@ -70,5 +75,38 @@ struct SettingsView: View {
         panel.showsHiddenFiles = true
         panel.message = "Choose the Codex executable"
         if panel.runModal() == .OK, let url = panel.url { draft.codexPath = url.path }
+    }
+}
+
+/// Settings must outlive the transient MenuBarExtra popup, including when a
+/// picker, file dialog, or connection window takes focus.
+@MainActor
+final class SettingsWindowController: NSObject, NSWindowDelegate {
+    private var window: NSWindow?
+
+    func show(store: UsageStore) {
+        if let window {
+            NSApp.activate(ignoringOtherApps: true)
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 450, height: 650),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.title = "Usage Menu Bar Settings"
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        window.contentView = NSHostingView(rootView: SettingsView(store: store) { [weak self] in
+            self?.window?.close()
+        })
+        self.window = window
+        window.center()
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        // Release the draft so the next opening starts from saved preferences.
+        window?.contentView = nil
+        window = nil
     }
 }

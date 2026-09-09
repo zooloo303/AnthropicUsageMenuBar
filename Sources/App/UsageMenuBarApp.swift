@@ -28,7 +28,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.title = "Usage Menu Bar · Preview (sample data)"
             let previewStore = UsageStore(preview: true)
             if CommandLine.arguments.contains("--settings-preview") {
-                window.contentView = NSHostingView(rootView: SettingsView(store: previewStore))
+                window.contentView = NSHostingView(rootView: SettingsView(store: previewStore) { [weak window] in
+                    window?.close()
+                })
             } else {
                 window.contentView = NSHostingView(rootView: ContentView(store: previewStore))
             }

@@ -3,7 +3,6 @@ import UsageCore
 
 struct ContentView: View {
     @ObservedObject var store: UsageStore
-    @State private var showingSettings = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -25,7 +24,7 @@ struct ContentView: View {
                 VStack(spacing: 12) {
                     ForEach(store.visibleProviders) { provider in
                         ProviderCard(provider: provider, state: store.states[provider] ?? ProviderState(),
-                                     interval: store.preferences.interval)
+                                     interval: store.preferences.interval, connectClaude: { store.connectClaude() })
                     }
                 }
             }
@@ -35,7 +34,7 @@ struct ContentView: View {
                 Text("Updates every \(store.preferences.interval) min")
                     .font(.caption2).foregroundStyle(.secondary)
                 Spacer()
-                Button { showingSettings = true } label: { Image(systemName: "gearshape") }
+                Button { store.showSettings() } label: { Image(systemName: "gearshape") }
                     .help("Settings").accessibilityLabel("Settings")
                 Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
                     .help("Quit Usage Menu Bar").accessibilityLabel("Quit Usage Menu Bar")
@@ -46,7 +45,6 @@ struct ContentView: View {
         .frame(width: 370)
         .fixedSize(horizontal: false, vertical: true)
         .background(.regularMaterial)
-        .sheet(isPresented: $showingSettings) { SettingsView(store: store) }
         .task { await store.refreshIfDue() }
     }
 }
@@ -55,6 +53,7 @@ private struct ProviderCard: View {
     let provider: Provider
     let state: ProviderState
     let interval: Int
+    let connectClaude: () -> Void
     private var accent: Color { provider == .claude ? Color(red: 0.77, green: 0.43, blue: 0.31) : Color(red: 0.18, green: 0.61, blue: 0.48) }
 
     var body: some View {
@@ -74,6 +73,9 @@ private struct ProviderCard: View {
                 if state.loading { ProgressView().controlSize(.small) }
                 Link(destination: provider.usageURL) { Image(systemName: "arrow.up.right") }
                     .foregroundStyle(.secondary).help("Open \(provider.title) usage page")
+            }
+            if provider == .claude && state.error != nil {
+                Button("Connect Claude…", action: connectClaude).font(.caption)
             }
             if let snapshot = state.snapshot {
                 ForEach(snapshot.windows) { window in

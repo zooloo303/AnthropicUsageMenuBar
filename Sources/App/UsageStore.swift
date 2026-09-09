@@ -45,6 +45,8 @@ struct ProviderState {
 final class UsageStore: ObservableObject {
     @Published private(set) var preferences: Preferences
     @Published private(set) var states: [Provider: ProviderState] = [.claude: ProviderState(), .codex: ProviderState()]
+    private let claudeConnection = ClaudeConnection()
+    private let settingsWindow = SettingsWindowController()
     private var timer: Timer?
     private var wakeObserver: NSObjectProtocol?
     private let preview: Bool
@@ -112,6 +114,19 @@ final class UsageStore: ObservableObject {
         Task { await refreshAll() }
     }
 
+    func showSettings() {
+        settingsWindow.show(store: self)
+    }
+
+    func connectClaude() {
+        guard !preview else { return }
+        claudeConnection.show { [weak self] snapshot in
+            guard let self else { return }
+            self.requestIDs[.claude] = UUID()
+            self.states[.claude] = ProviderState(snapshot: snapshot, nextAllowedRefresh: Date().addingTimeInterval(60))
+        }
+    }
+
     func refreshAll() async {
         async let claude: Void = refresh(.claude)
         async let codex: Void = refresh(.codex)
@@ -142,7 +157,9 @@ final class UsageStore: ObservableObject {
         do {
             let result: UsageSnapshot
             switch provider {
-            case .claude: result = try await ClaudeClient().fetch()
+            case .claude:
+                if claudeConnection.isConnected { result = try await claudeConnection.fetch() }
+                else { result = try await ClaudeClient().fetch() }
             case .codex:
                 guard let executable = CodexLocator.find(override: path) else {
                     throw UsageError.message("Codex wasn't found. Install Codex or choose its executable in Settings, then sign in with ChatGPT.")

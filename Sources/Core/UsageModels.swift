@@ -51,10 +51,14 @@ public struct UsageSnapshot: Sendable {
 public enum UsageError: LocalizedError, Sendable {
     case message(String)
     case throttled(Date)
+    case authenticationRequired
+    case claudeWebSignInRequired
 
     public var errorDescription: String? {
         switch self {
         case .message(let message): return message
+        case .authenticationRequired: return "Connect Claude to save your sign-in without recurring Keychain prompts."
+        case .claudeWebSignInRequired: return "Open Connect Claude to sign in and save your connection."
         case .throttled(let date): return "Too many requests. Retrying after \(date.formatted(date: .omitted, time: .shortened))."
         }
     }
