@@ -28,7 +28,34 @@ struct ClaudeWebClientTests {
                 return response(request, body: "{\"five_hour\":{\"utilization\":42,\"resets_at\":null}}")
             }
             #expect(result.snapshot.windows[0].usedPercent == 42)
+            #expect(result.snapshot.plan == nil)
         }
+    }
+
+    @Test(arguments: [
+        (#""capabilities":["chat","raven"],"rate_limit_tier":"default_raven","raven_type":"team","billing_type":"stripe_subscription""#, "Team"),
+        (#""capabilities":["chat","raven"],"rate_limit_tier":"default_raven","raven_type":"enterprise""#, "Enterprise"),
+        (#""capabilities":["chat","raven"],"rate_limit_tier":"default_raven","raven_type":"unknown""#, nil),
+        (#""capabilities":["chat","claude_max"]"#, "Max"),
+        (#""capabilities":["chat","claude_pro"]"#, "Pro"),
+        (#""capabilities":["chat","claude_team"]"#, "Team"),
+        (#""capabilities":["chat","claude_enterprise"]"#, "Enterprise"),
+        (#""rate_limit_tier":"default_claude_max_5x""#, "Max"),
+        (#""rate_limit_tier":"default_claude_max_20x""#, "Max"),
+        (#""rate_limit_tier":"default_claude_pro""#, "Pro"),
+        (#""capabilities":["chat","api","unknown"],"rate_limit_tier":"unknown""#, nil),
+        (#""capabilities":null,"rate_limit_tier":null"#, nil)
+    ] as [(String, String?)])
+    func subscriptionComesFromSelectedWebOrganization(metadata: String, expected: String?) async throws {
+        let result = try await ClaudeWebClient().fetch(cookies: [cookie(), cookie("lastActiveOrg", secondOrg)]) { request in
+            if request.url!.path == "/api/organizations" {
+                return response(request, body: "[{\"uuid\":\"\(org)\",\"capabilities\":[\"claude_pro\"]},{\"uuid\":\"\(secondOrg)\",\(metadata)}]")
+            }
+            #expect(request.url!.path == "/api/organizations/\(secondOrg)/usage")
+            return response(request, body: #"{"five_hour":{"utilization":42,"resets_at":null}}"#)
+        }
+        #expect(result.snapshot.planDisplayName == expected)
+        #expect(result.snapshot.windows[0].usedPercent == 42)
     }
 
     @Test func missingSessionMakesNoNetworkRequest() async {

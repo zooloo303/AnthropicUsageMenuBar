@@ -67,7 +67,7 @@ public struct ClaudeWebClient {
             throw UsageError.message("Claude returned an invalid organization.")
         }
         let data = try await get("/api/organizations/\(organization.uuid)/usage")
-        return (try UsageParser.claude(data), updates)
+        return (try UsageParser.claude(data, plan: organization.plan), updates)
     }
 
     static func isClaudeCookie(_ cookie: HTTPCookie) -> Bool {
@@ -75,7 +75,38 @@ public struct ClaudeWebClient {
             && (cookie.expiresDate.map { $0 > Date() } ?? true)
     }
 
-    private struct Organization: Decodable { let uuid: String }
+    private struct Organization: Decodable {
+        let uuid: String
+        let capabilities: [String]?
+        let rateLimitTier: String?
+        let ravenType: String?
+
+        enum CodingKeys: String, CodingKey {
+            case uuid, capabilities
+            case rateLimitTier = "rate_limit_tier"
+            case ravenType = "raven_type"
+        }
+
+        var plan: String? {
+            // Only use metadata from the organization whose usage we fetched.
+            // Generic chat/API capabilities do not identify a subscription.
+            // Team/Enterprise web organizations use the internal Raven name.
+            switch ravenType {
+            case "team": return "team"
+            case "enterprise": return "enterprise"
+            default: break
+            }
+            for (capability, plan) in [("claude_enterprise", "enterprise"), ("claude_team", "team"),
+                                       ("claude_max", "max"), ("claude_pro", "pro")] {
+                if capabilities?.contains(capability) == true { return plan }
+            }
+            switch rateLimitTier {
+            case "default_claude_max_5x", "default_claude_max_20x": return "max"
+            case "default_claude_pro": return "pro"
+            default: return nil
+            }
+        }
+    }
 }
 
 private final class ClaudeWebNoRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
