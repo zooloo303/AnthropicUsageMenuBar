@@ -16,7 +16,11 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "AnthropicUsageMenuBar",
-            path: "Sources"
-        )
+            dependencies: ["UsageCore"],
+            path: "Sources/App"
+        ),
+        .target(name: "UsageCore", path: "Sources/Core"),
+        .executableTarget(name: "UsageProbe", dependencies: ["UsageCore"], path: "Sources/Probe"),
+        .testTarget(name: "UsageCoreTests", dependencies: ["UsageCore"], path: "Tests")
     ]
 )
